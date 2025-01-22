@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitcoin Key Search</title>
+    <style>
+        /* Resetando margens e padding */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* Corpo da página */
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #f4f7fa;
+            color: #333;
+            padding: 20px;
+        }
+
+        /* Estilo do título */
+        h1 {
+            text-align: center;
+            color: #4b8d7b;
+            margin-bottom: 30px;
+        }
+
+        /* Formulário */
+        #searchForm {
+            background: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            margin: 0 auto;
+            display: block;
+        }
+
+        /* Estilo dos rótulos */
+        label {
+            font-size: 1.1rem;
+            color: #555;
+            margin-bottom: 10px;
+            display: inline-block;
+        }
+
+        /* Estilo dos campos de entrada */
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 1rem;
+            color: #333;
+            transition: all 0.3s ease;
+        }
+
+        input[type="text"]:focus {
+            border-color: #4b8d7b;
+            outline: none;
+        }
+
+        /* Estilo dos botões */
+        button {
+            width: 48%;
+            padding: 10px;
+            font-size: 1.1rem;
+            color: #fff;
+            background-color: #4b8d7b;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:disabled {
+            background-color: #ccc;
+        }
+
+        button:hover {
+            background-color: #398c68;
+        }
+
+        /* Estilo para o status */
+        #status {
+            margin-top: 20px;
+            font-size: 1.2rem;
+            color: #ff6347;
+            text-align: center;
+        }
+
+        /* Responsividade */
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 1.5rem;
+            }
+
+            #searchForm {
+                padding: 15px;
+                max-width: 100%;
+            }
+
+            button {
+                width: 100%;
+                margin-bottom: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<h1>Bitcoin Private Key Search</h1>
+
+<form id="searchForm">
+    <label for="rangeStart">Start Range:</label>
+    <input type="text" id="rangeStart" value="40000000000000000" required><br>
+
+    <label for="rangeEnd">End Range:</label>
+    <input type="text" id="rangeEnd" value="7FFFFFFFFFFFFFFFF" required><br>
+
+    <label for="targetHash">Target Hash:</label>
+    <input type="text" id="targetHash" value="739437bb3dd6d1983e66629c5f08c70e52769371" required><br>
+
+    <label for="minStep">Min Step:</label>
+    <input type="text" id="minStep" value="10000000000000000" required><br>
+
+    <label for="maxStep">Max Step:</label>
+    <input type="text" id="maxStep" value="100000000000000000" required><br>
+
+    <button type="submit" id="startButton">Start Search</button>
+    <button type="button" id="stopButton" disabled>Stop Search</button>
+</form>
+
+<div id="status"></div>
+
+<script>
+  let isSearching = false;  // Variável para controlar o status de busca
+
+  // Manipula o envio do formulário de busca
+  document.getElementById('searchForm').addEventListener('submit', async function (e) {
+      e.preventDefault();
+
+      const rangeStart = document.getElementById('rangeStart').value.trim();
+      const rangeEnd = document.getElementById('rangeEnd').value.trim();
+      const targetHash = document.getElementById('targetHash').value.trim();
+      const minStep = document.getElementById('minStep').value.trim();
+      const maxStep = document.getElementById('maxStep').value.trim();
+
+      if (!rangeStart || !rangeEnd || !targetHash || !minStep || !maxStep) {
+          document.getElementById('status').textContent = 'All fields are required.';
+          return;
+      }
+
+      try {
+          document.getElementById('startButton').disabled = true;
+          document.getElementById('stopButton').disabled = false;
+          document.getElementById('status').textContent = 'Starting search...';
+
+          const response = await fetch('/start-search', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                  rangeStart,
+                  rangeEnd,
+                  targetHash,
+                  minStep,
+                  maxStep
+              })
+          });
+
+          const data = await response.json();
+
+          if (data.type === 'found') {
+              alert(`Private key found: ${data.privateKey}`);
+          }
+
+          document.getElementById('status').textContent = 'Search completed or stopped.';
+          document.getElementById('startButton').disabled = false;
+          document.getElementById('stopButton').disabled = true;
+
+      } catch (error) {
+          document.getElementById('status').textContent = 'An error occurred. Please try again.';
+          console.error(error);
+      }
+  });
+
+  // Manipula o clique no botão de parar
+  document.getElementById('stopButton').addEventListener('click', async function () {
+      if (isSearching) {
+          try {
+              const response = await fetch('/stop-search', { method: 'POST' });
+              const data = await response.json();
+
+              if (data.type === 'stopped') {
+                  document.getElementById('status').textContent = 'Search stopped.';
+                  document.getElementById('startButton').disabled = false;
+                  document.getElementById('stopButton').disabled = true;
+                  isSearching = false;  // Atualiza o estado para indicar que a busca foi parada
+              } else {
+                  document.getElementById('status').textContent = 'No active search to stop.';
+              }
+          } catch (error) {
+              document.getElementById('status').textContent = 'Failed to stop the search.';
+              console.error(error);
+          } finally {
+             document.getElementById('startButton').disabled = false;
+     
+          }
+       }
+    });
+      
+  
+</script>
+
+
+</body>
+</html>
